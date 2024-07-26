@@ -11,6 +11,16 @@ always@(posedge clk)begin
         y <= a + b;
 end
 
-///ad
-
 endmodule
+
+/////////////////////////////////////////////////
+
+interface add_if();
+
+logic clk;
+logic rst;
+logic [3:0] a;
+logic [3:0] b;
+logic [4:0] y;
+
+endinterface
