@@ -90,21 +90,21 @@ transaction t;
 virtual add_if aif;
 
 virtual function build_phase(uvm_phase phase);
-super.build_phase(phase);
-t = transaction::type_id::create("t");
-if(!uvm_config_db #(virtual add_if)::get(this,,"aif", aif))
-    `uvm_error("MON", "Unable to access uvm_config_db");
+    super.build_phase(phase);
+    t = transaction::type_id::create("t");
+    if(!uvm_config_db #(virtual add_if)::get(this,,"aif", aif))
+        `uvm_error("MON", "Unable to access uvm_config_db");
 endfunction
 
 virtual task run_phase(uvm_phase phase);
-forever begin
-#10;
-t.a = aif.a;
-t.b = aif.b;
-t.y = aif.y;
-`uvm_info("MON", $sformatf("Data send to scoreboard a : %0d, b : %0d, y : %0d", t.a, t.b, t.y), UVM_NONE);
-send.write(t); //send data to scoreboard
-end
+    forever begin
+        #10;
+        t.a = aif.a;
+        t.b = aif.b;
+        t.y = aif.y;
+        `uvm_info("MON", $sformatf("Data send to scoreboard a : %0d, b : %0d, y : %0d", t.a, t.b, t.y), UVM_NONE);
+        send.write(t); //send data to scoreboard
+    end
 endtask
 
 endclass
@@ -127,14 +127,39 @@ virtual function build_phase(uvm_phase phase);
 endfunction
 
 virtual function void write(input transaction t);
-tr = t;
-`uvm_info("SCO", $sformatf("Data rcvd from Monitor a : %0d, b : %0d, y : %0d", tr.a, tr.b, tr.y), UVM_NONE);
+    tr = t;
+    `uvm_info("SCO", $sformatf("Data rcvd from Monitor a : %0d, b : %0d, y : %0d", tr.a, tr.b, tr.y), UVM_NONE);
 
-if(tr.a + tr.b == tr.y)
-    `uvm_info("SCO", "TEST PASSED", UVM_NONE);
-else
-    `uvm_info("SCO", "TEST FAILED", UVM_NONE);
+    if(tr.a + tr.b == tr.y)
+        `uvm_info("SCO", "TEST PASSED", UVM_NONE);
+    else
+        `uvm_info("SCO", "TEST FAILED", UVM_NONE);
 
+endfunction
+
+endclass
+/////////////////////////////////////////////////
+class agent extends uvm_agent;
+`uvm_component_utils(agent)
+
+function new(input string inst = "AGENT", uvm_component parent);
+    super.new(inst, parent);
+endfunction
+
+monitor m;
+driver d;
+uvm_sequencer #(transaction) seqr;
+
+virtual function build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    m = monitor::type_id::create("m", this);
+    d = driver::type_id::create("d", this);
+    seqr = uvm_sequencer #(transaction)::type_id::create("seqr", this);
+endfunction
+
+virtual function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    d.seq_item_port.connect(seqr.seq_item_export); // connect driver and sequencer.
 endfunction
 
 endclass
