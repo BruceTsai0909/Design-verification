@@ -9,7 +9,7 @@ rand bit [3:0] a;
 rand bit [3:0] b;
 bit [4:0] y;
 
-function new(input string path = "transaction")
+function new(input string path = "transaction");
     super.new(path);
 endfunction
 
@@ -33,11 +33,11 @@ function new(string path = "generator");
 endfunction
 
 virtual task body();
-t = transaction::type_id::create::("t");
+t = transaction::type_id::create("t");
 repeat(10) begin
     start_item(t);
     t.randomize();
-    `uvm_info("GEN", $formatf("Data send to driver a : %0d, b : %0d", t.a, t.b), UVM_NONE);
+  `uvm_info("GEN", $sformatf("Data send to driver a : %0d, b : %0d", t.a, t.b), UVM_NONE);
     finish_item(t);
 end
 endtask
@@ -81,7 +81,7 @@ class monitor extends uvm_monitor;
 
 uvm_analysis_port #(transaction) send;
 
-function new(input string inst = "monitor", uvm_component parent = bull);
+  function new(input string path = "monitor", uvm_component parent = null);
     super.new(path, parent);
     send = new("send", this);
 endfunction
@@ -89,10 +89,10 @@ endfunction
 transaction t;
 virtual add_if aif;
 
-virtual function build_phase(uvm_phase phase);
+virtual function void build_phase(uvm_phase phase);
     super.build_phase(phase);
     t = transaction::type_id::create("t");
-    if(!uvm_config_db #(virtual add_if)::get(this,,"aif", aif))
+  if(!uvm_config_db #(virtual add_if)::get(this,"","aif", aif))
         `uvm_error("MON", "Unable to access uvm_config_db");
 endfunction
 
@@ -103,7 +103,7 @@ virtual task run_phase(uvm_phase phase);
         t.b = aif.b;
         t.y = aif.y;
         `uvm_info("MON", $sformatf("Data send to scoreboard a : %0d, b : %0d, y : %0d", t.a, t.b, t.y), UVM_NONE);
-        send.write(t); //send data to scoreboard
+        send.write(t); //send data to scoreboard //調用了 uvm_analysis_port 的 write 方法
     end
 endtask
 
@@ -121,7 +121,7 @@ function new(input string path = "scoreboard", uvm_component parent = null);
     recv = new("recv", this);
 endfunction
 
-virtual function build_phase(uvm_phase phase);
+virtual function void build_phase(uvm_phase phase);
     super.build_phase(phase);
     tr = transaction::type_id::create("tr");
 endfunction
@@ -130,10 +130,12 @@ virtual function void write(input transaction t);
     tr = t;
     `uvm_info("SCO", $sformatf("Data rcvd from Monitor a : %0d, b : %0d, y : %0d", tr.a, tr.b, tr.y), UVM_NONE);
 
-    if(tr.a + tr.b == tr.y)
+    if(tr.a + tr.b == tr.y) begin
         `uvm_info("SCO", "TEST PASSED", UVM_NONE);
-    else
+    end
+    else begin
         `uvm_info("SCO", "TEST FAILED", UVM_NONE);
+    end
 
 endfunction
 
@@ -142,15 +144,15 @@ endclass
 class agent extends uvm_agent;
 `uvm_component_utils(agent)
 
-function new(input string inst = "AGENT", uvm_component parent);
-    super.new(inst, parent);
+function new(input string inst = "AGENT", uvm_component c);
+    super.new(inst, c);
 endfunction
 
 monitor m;
 driver d;
 uvm_sequencer #(transaction) seqr;
 
-virtual function build_phase(uvm_phase phase);
+virtual function void build_phase(uvm_phase phase);
     super.build_phase(phase);
     m = monitor::type_id::create("m", this);
     d = driver::type_id::create("d", this);
@@ -163,4 +165,72 @@ virtual function void connect_phase(uvm_phase phase);
 endfunction
 
 endclass
+/////////////////////////////////////////////////
+class env extends uvm_env;
+`uvm_component_utils(env)
+
+function new(input string inst = "ENV", uvm_component c);
+    super.new(inst, c);
+endfunction
+
+scoreboard s;
+agent a;
+
+virtual function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    s = scoreboard::type_id::create("s", this);
+    a = agent::type_id::create("a", this);
+endfunction
+
+virtual function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    a.m.send.connect(s.recv);
+endfunction
+
+
+endclass
+/////////////////////////////////////////////////
+class test extends uvm_test;
+`uvm_component_utils(test)
+
+function new(input string inst = "TEST", uvm_component c);
+    super.new(inst, c);
+endfunction
+
+generator gen;
+env e;
+
+virtual function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    gen = generator::type_id::create("gen"); // belongs to uvm sequence (single argument)
+    e = env::type_id::create("e", this); //belongs to uvm component (two argument)
+endfunction
+
+virtual task run_phase(uvm_phase phase);
+    phase.raise_objection(this);
+    gen.start(e.a.seqr);
+    phase.drop_objection(this);
+endtask
+endclass
+/////////////////////////////////////////////////
+
+module add_tb();
+
+add_if aif();
+
+add dut(.a(aif.a), .b(aif.b), .y(aif.y));
+
+initial begin
+    $dumpfile("dump.vcd");
+    $dumpvars;
+end
+
+initial begin
+    uvm_config_db #(virtual add_if)::set(null, "uvm_test_top.e.a*", "aif", aif);
+    run_test("test");
+end
+
+
+
+endmodule
 /////////////////////////////////////////////////
