@@ -13,7 +13,7 @@ reg [4:0] cnt; // might count to 16.
 always@(posedge clk)begin
     if (rst) begin
         wprt <= 0;
-        rptr <= 0;
+        rprt <= 0;
         cnt <= 0;
     end
     else if (wr && !full) begin
@@ -23,7 +23,7 @@ always@(posedge clk)begin
     end
     else if (rd && !empty) begin
         dout <= mem[rprt];
-        rptr <= rprt + 1;
+        rprt <= rprt + 1;
         cnt <= cnt - 1;
     end
 end
